@@ -1,0 +1,322 @@
+import csv
+import json
+from datetime import datetime
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+# Hardcoded stock prices dictionary
+STOCK_PRICES = {
+    "AAPL": 180.50,
+    "GOOGL": 142.30,
+    "MSFT": 375.80,
+    "TSLA": 250.20,
+    "AMZN": 185.40,
+    "META": 520.65,
+    "NFLX": 450.30,
+    "NVDA": 875.50
+}
+
+class StockPortfolio:
+    """A class to manage a stock portfolio."""
+    
+    def __init__(self):
+        """Initialize an empty portfolio."""
+        self.portfolio = {}  # {symbol: quantity}
+    
+    def add_stock(self, symbol, quantity):
+        """Add or update a stock in the portfolio."""
+        symbol = symbol.upper()
+        
+        if symbol not in STOCK_PRICES:
+            print(f"❌ Error: '{symbol}' not found in available stocks.")
+            print(f"Available stocks: {', '.join(STOCK_PRICES.keys())}")
+            return False
+        
+        if quantity <= 0:
+            print("❌ Error: Quantity must be greater than 0.")
+            return False
+        
+        if symbol in self.portfolio:
+            self.portfolio[symbol] += quantity
+            print(f"✓ Added {quantity} shares of {symbol}. Total: {self.portfolio[symbol]} shares.")
+        else:
+            self.portfolio[symbol] = quantity
+            print(f"✓ Added {quantity} shares of {symbol}.")
+        
+        return True
+    
+    def remove_stock(self, symbol, quantity):
+        """Remove shares from the portfolio."""
+        symbol = symbol.upper()
+        
+        if symbol not in self.portfolio:
+            print(f"❌ Error: '{symbol}' not found in your portfolio.")
+            return False
+        
+        if quantity > self.portfolio[symbol]:
+            print(f"❌ Error: Cannot sell {quantity} shares. You only have {self.portfolio[symbol]}.")
+            return False
+        
+        self.portfolio[symbol] -= quantity
+        
+        if self.portfolio[symbol] == 0:
+            del self.portfolio[symbol]
+            print(f"✓ Sold all {quantity} shares of {symbol}.")
+        else:
+            print(f"✓ Sold {quantity} shares of {symbol}. Remaining: {self.portfolio[symbol]} shares.")
+        
+        return True
+    
+    def get_portfolio_value(self):
+        """Calculate the total portfolio value."""
+        total = 0
+        for symbol, quantity in self.portfolio.items():
+            total += STOCK_PRICES[symbol] * quantity
+        return total
+    
+    def display_portfolio(self):
+        """Display the current portfolio."""
+        if not self.portfolio:
+            print("\n📊 Your portfolio is empty.")
+            return
+        
+        print("\n" + "=" * 80)
+        print("📊 STOCK PORTFOLIO")
+        print("=" * 80)
+        print(f"{'Symbol':<10} {'Quantity':<15} {'Price ($)':<15} {'Value ($)':<20}")
+        print("-" * 80)
+        
+        total_value = 0
+        for symbol in sorted(self.portfolio.keys()):
+            quantity = self.portfolio[symbol]
+            price = STOCK_PRICES[symbol]
+            value = quantity * price
+            total_value += value
+            
+            print(f"{symbol:<10} {quantity:<15} {price:<15.2f} {value:<20,.2f}")
+        
+        print("-" * 80)
+        print(f"{'TOTAL PORTFOLIO VALUE':<40} ${total_value:,.2f}")
+        print("=" * 80)
+    
+    def display_available_stocks(self):
+        """Display all available stocks with their prices."""
+        print("\n" + "=" * 50)
+        print("📈 AVAILABLE STOCKS")
+        print("=" * 50)
+        print(f"{'Symbol':<15} {'Price ($)':<15}")
+        print("-" * 50)
+        
+        for symbol in sorted(STOCK_PRICES.keys()):
+            price = STOCK_PRICES[symbol]
+            print(f"{symbol:<15} {price:<15.2f}")
+        
+        print("=" * 50)
+    
+    def export_to_csv(self, filename=None):
+        """Export portfolio to a CSV file."""
+        if not self.portfolio:
+            print("❌ Error: Cannot export empty portfolio.")
+            return False
+        
+        if filename is None:
+            filename = f"portfolio_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        
+        try:
+            with open(filename, 'w', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                
+                # Write header
+                writer.writerow(['Stock Symbol', 'Quantity', 'Price ($)', 'Total Value ($)'])
+                
+                # Write portfolio data
+                total_value = 0
+                for symbol in sorted(self.portfolio.keys()):
+                    quantity = self.portfolio[symbol]
+                    price = STOCK_PRICES[symbol]
+                    value = quantity * price
+                    total_value += value
+                    writer.writerow([symbol, quantity, f"{price:.2f}", f"{value:.2f}"])
+                
+                # Write total
+                writer.writerow([])
+                writer.writerow(['TOTAL PORTFOLIO VALUE', '', '', f"{total_value:.2f}"])
+                
+                # Write metadata
+                writer.writerow([])
+                writer.writerow(['Export Date', datetime.now().strftime('%Y-%m-%d %H:%M:%S')])
+            
+            print(f"✓ Portfolio exported to '{filename}'")
+            return True
+        
+        except IOError as e:
+            print(f"❌ Error writing to file: {e}")
+            return False
+    
+    def export_to_excel(self, filename=None):
+        """Export portfolio to an Excel file with formatting."""
+        if not self.portfolio:
+            print("❌ Error: Cannot export empty portfolio.")
+            return False
+        
+        if filename is None:
+            filename = f"portfolio_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        
+        try:
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Portfolio"
+            
+            # Define styles
+            header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+            header_font = Font(bold=True, color="FFFFFF", size=12)
+            total_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+            total_font = Font(bold=True, size=11)
+            border = Border(
+                left=Side(style='thin'),
+                right=Side(style='thin'),
+                top=Side(style='thin'),
+                bottom=Side(style='thin')
+            )
+            
+            # Add title
+            ws['A1'] = "STOCK PORTFOLIO"
+            ws['A1'].font = Font(bold=True, size=14)
+            ws.merge_cells('A1:D1')
+            ws['A1'].alignment = Alignment(horizontal='center')
+            
+            # Add headers
+            headers = ['Stock Symbol', 'Quantity', 'Price ($)', 'Total Value ($)']
+            for col, header in enumerate(headers, 1):
+                cell = ws.cell(row=3, column=col)
+                cell.value = header
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = Alignment(horizontal='center')
+                cell.border = border
+            
+            # Add portfolio data
+            row = 4
+            total_value = 0
+            for symbol in sorted(self.portfolio.keys()):
+                quantity = self.portfolio[symbol]
+                price = STOCK_PRICES[symbol]
+                value = quantity * price
+                total_value += value
+                
+                ws.cell(row=row, column=1).value = symbol
+                ws.cell(row=row, column=2).value = quantity
+                ws.cell(row=row, column=3).value = price
+                ws.cell(row=row, column=4).value = f"=B{row}*C{row}"  # Formula
+                
+                for col in range(1, 5):
+                    cell = ws.cell(row=row, column=col)
+                    cell.border = border
+                    if col in [2, 3, 4]:
+                        cell.alignment = Alignment(horizontal='right')
+                
+                row += 1
+            
+            # Add total row
+            total_row = row
+            ws.cell(row=total_row, column=1).value = "TOTAL PORTFOLIO VALUE"
+            ws.cell(row=total_row, column=4).value = f"=SUM(D4:D{total_row-1})"
+            
+            for col in range(1, 5):
+                cell = ws.cell(row=total_row, column=col)
+                cell.fill = total_fill
+                cell.font = total_font
+                cell.border = border
+                if col in [2, 3, 4]:
+                    cell.alignment = Alignment(horizontal='right')
+            
+            # Add metadata
+            ws.cell(row=total_row+2, column=1).value = "Export Date:"
+            ws.cell(row=total_row+2, column=2).value = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            # Format columns
+            ws.column_dimensions['A'].width = 15
+            ws.column_dimensions['B'].width = 15
+            ws.column_dimensions['C'].width = 15
+            ws.column_dimensions['D'].width = 18
+            
+            # Format currency columns
+            for row_cells in ws.iter_rows(min_row=4, max_row=total_row, min_col=3, max_col=4):
+                for cell in row_cells:
+                    cell.number_format = '$#,##0.00'
+            
+            wb.save(filename)
+            print(f"✓ Portfolio exported to '{filename}'")
+            return True
+        
+        except Exception as e:
+            print(f"❌ Error writing Excel file: {e}")
+            return False
+
+def display_menu():
+    """Display the main menu."""
+    print("\n" + "=" * 50)
+    print("STOCK PORTFOLIO TRACKER")
+    print("=" * 50)
+    print("1. View available stocks")
+    print("2. Add stock to portfolio")
+    print("3. Remove stock from portfolio")
+    print("4. View portfolio")
+    print("5. Export to CSV")
+    print("6. Export to Excel")
+    print("7. Exit")
+    print("=" * 50)
+
+def main():
+    """Main program loop."""
+    portfolio = StockPortfolio()
+    
+    print("\n🎯 Welcome to Stock Portfolio Tracker!")
+    print("Manage your investment portfolio with ease.\n")
+    
+    while True:
+        display_menu()
+        choice = input("Enter your choice (1-7): ").strip()
+        
+        if choice == '1':
+            portfolio.display_available_stocks()
+        
+        elif choice == '2':
+            symbol = input("Enter stock symbol (e.g., AAPL): ").strip()
+            try:
+                quantity = int(input("Enter quantity: ").strip())
+                portfolio.add_stock(symbol, quantity)
+            except ValueError:
+                print("❌ Error: Please enter a valid number for quantity.")
+        
+        elif choice == '3':
+            if not portfolio.portfolio:
+                print("❌ Error: Portfolio is empty.")
+            else:
+                symbol = input("Enter stock symbol to remove: ").strip()
+                try:
+                    quantity = int(input("Enter quantity to remove: ").strip())
+                    portfolio.remove_stock(symbol, quantity)
+                except ValueError:
+                    print("❌ Error: Please enter a valid number for quantity.")
+        
+        elif choice == '4':
+            portfolio.display_portfolio()
+        
+        elif choice == '5':
+            custom_filename = input("Enter filename (or press Enter for default): ").strip()
+            portfolio.export_to_csv(custom_filename if custom_filename else None)
+        
+        elif choice == '6':
+            custom_filename = input("Enter filename (or press Enter for default): ").strip()
+            portfolio.export_to_excel(custom_filename if custom_filename else None)
+        
+        elif choice == '7':
+            print("\n✓ Thank you for using Stock Portfolio Tracker. Goodbye!")
+            break
+        
+        else:
+            print("❌ Invalid choice. Please try again.")
+
+if __name__ == "__main__":
+    main()
